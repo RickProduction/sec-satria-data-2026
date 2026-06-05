@@ -1,0 +1,28 @@
+<table class="min-w-full bg-white">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Nama Pasien</th>
+            <th>Status Triase</th>
+            <th>Aksi</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for pasien in pasien_list %}
+        <tr class="{% if pasien.any_injury == 1 %} bg-red-100 border-l-4 border-red-600 {% else %} bg-green-50 {% endif %}">
+            <td>{{ pasien.id }}</td>
+            <td>{{ pasien.nama_pasien }}</td>
+            <td class="font-bold text-lg">
+                {% if pasien.any_injury == 1 %}
+                    <span class="text-red-700">Terindikasi Cedera ({{ pasien.confidence }}%)</span>
+                {% else %}
+                    <span class="text-green-700">Sehat / Normal</span>
+                {% endif %}
+            </td>
+            <td>
+                <a href="{{ url_for('detail', id=pasien.id) }}" class="bg-blue-500 text-white px-3 py-1 rounded">Lihat Detail CT Scan</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
