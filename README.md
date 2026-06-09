@@ -1,4 +1,4 @@
-readme_content = """# Sistem Pendukung Keputusan Klinis (SPKK) Deteksi Trauma Abdomen Multi-Organ
+# Sistem Pendukung Keputusan Klinis (SPKK) Deteksi Trauma Abdomen Multi-Organ
 
 SPKK Deteksi Trauma Abdomen Multi-Organ adalah sebuah platform digital berbasis Kecerdasan Buatan (AI) yang dirancang khusus untuk membantu tenaga medis di Instalasi Gawat Darurat (IGD) dalam melakukan triase pasien cedera perut. Sistem ini secara otomatis mampu mendeteksi indikasi trauma serta tingkat urgensi penanganan pada 4 organ target sekaligus: **Hati (Liver)**, **Ginjal (Kidney)**, **Limpa (Spleen)**, dan **Usus (Bowel)** dari hasil citra CT Scan abdomen berformat DICOM (`.dcm`).
 
@@ -41,3 +41,21 @@ Sistem ini sepenuhnya dibangun secara lokal tanpa ketergantungan pada CDN ekster
 ## 🗃️ Skema Database MySQL
 
 Sistem mengimplementasikan tabel tunggal teroptimasi bernama `riwayat_triase` untuk menyimpan catatan histori deteksi tanpa kehilangan data saat server dimatikan.
+
+```sql
+CREATE TABLE riwayat_triase (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nama_pasien VARCHAR(100) NOT NULL,
+    file_dicom VARCHAR(255) NOT NULL,
+    status_kritis TINYINT(1) DEFAULT 0,
+    probabilitas_max FLOAT DEFAULT 0.0,
+    hati_status VARCHAR(20),
+    hati_conf FLOAT,
+    ginjal_status VARCHAR(20),
+    ginjal_conf FLOAT,
+    limpa_status VARCHAR(20),
+    limpa_conf FLOAT,
+    usus_status VARCHAR(20),
+    usus_conf FLOAT,
+    waktu_periksa DATETIME DEFAULT CURRENT_TIMESTAMP
+);
