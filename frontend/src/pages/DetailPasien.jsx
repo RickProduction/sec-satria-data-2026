@@ -56,7 +56,7 @@ function DetailPasien() {
         </div>
         <div className="mt-4">
           <div className="flex justify-between text-xs mb-1">
-            <span className="text-gray-500">Tingkat Keyakinan</span>
+            <span className="text-gray-500">Tingkat Kerusakan</span>
             <span className="font-mono font-bold text-gray-700">{conf}%</span>
           </div>
           <div className="w-full bg-gray-100 rounded-full h-2.5 shadow-inner">

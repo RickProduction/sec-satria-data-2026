@@ -59,3 +59,28 @@ CREATE TABLE riwayat_triase (
     usus_conf FLOAT,
     waktu_periksa DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+## 📦 Panduan Instalasi & Pengoperasian
+
+Pastikan komputer Anda telah terpasang **Node.js**, **Python 3.10+**, dan **XAMPP/MySQL Control Panel**.
+
+### 1. Persiapan Database
+1. Buka XAMPP, aktifkan modul **Apache** dan **MySQL**.
+2. Masuk ke phpMyAdmin (`http://localhost/phpmyadmin`).
+3. Buat database baru dengan nama `db_spkk_trauma`.
+
+### 2. Konfigurasi Backend (Flask REST API)
+1. Buka terminal baru dan masuk ke folder backend:
+   ```bash
+   cd backend
+
+Buat dan aktifkan *Virtual Environment* (`.venv`):
+
+```bash
+# Windows (PowerShell / CMD)
+python -m venv .venv
+.venv\Scripts\activate
+
+# Linux / macOS / Git Bash Windows
+python3 -m venv .venv
+source .venv/bin/activate
