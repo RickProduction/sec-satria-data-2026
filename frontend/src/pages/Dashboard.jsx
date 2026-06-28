@@ -6,6 +6,7 @@ function Dashboard() {
   const [pasienList, setPasienList] = useState([]);
   const [namaPasien, setNamaPasien] = useState('');
   const [fileDicom, setFileDicom] = useState(null);
+  const [fileName, setFileName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -29,7 +30,10 @@ function Dashboard() {
   // Handle proses upload dan analisis AI
   const handleUpload = async (e) => {
     e.preventDefault();
-    if (!fileDicom || !namaPasien) return;
+    if (!fileDicom || !namaPasien) {
+      setError('Silakan isi nama pasien dan pilih file');
+      return;
+    }
 
     setLoading(true);
     setError('');
@@ -40,24 +44,44 @@ function Dashboard() {
 
     try {
       const response = await axios.post('http://localhost:5000/api/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 60000 // 60 detik timeout
       });
       
       if (response.data.status === 'success') {
-        // Jika sukses, langsung arahkan ke halaman detail menggunakan ID dari backend
         navigate(`/detail/${response.data.id_pasien}`);
       }
     } catch (err) {
+      console.error('Upload error:', err);
       setError(err.response?.data?.message || 'Gagal memproses rekam medis.');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFileDicom(file);
+      setFileName(file.name);
+      
+      // Validasi ekstensi
+      const validExtensions = ['.dcm', '.jpg', '.jpeg', '.png'];
+      const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+      if (!validExtensions.includes(ext)) {
+        setError('Format file tidak didukung. Gunakan .dcm, .jpg, .jpeg, atau .png');
+        setFileDicom(null);
+        setFileName('');
+      } else {
+        setError('');
+      }
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto p-8">
       <h1 className="text-3xl font-extrabold mb-2 text-blue-900">Sistem Pendukung Keputusan Keputusan Klinis (SPKK)</h1>
-      <p class="text-gray-600 mb-8">Deteksi Trauma Abdomen Multi-Organ Berbasis Random Forest</p>
+      <p className="text-gray-600 mb-8">Deteksi Trauma Abdomen Multi-Organ Berbasis Random Forest</p>
 
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4">
@@ -81,23 +105,36 @@ function Dashboard() {
             />
           </div>
           <div className="flex-1 w-full">
-            <label className="block text-sm font-semibold text-gray-700 mb-1">File CT Scan (.dcm)</label>
-            <input 
-              type="file" 
-              accept=".dcm"
-              onChange={(e) => setFileDicom(e.target.files[0])}
-              required 
-              className="w-full border border-gray-300 p-2 rounded-lg bg-gray-50 text-sm"
-            />
+            <label className="block text-sm font-semibold text-gray-700 mb-1">File CT Scan (.dcm / .jpg / .png)</label>
+            <div className="relative">
+              <input 
+                type="file" 
+                accept=".dcm,.jpg,.jpeg,.png"
+                onChange={handleFileChange}
+                required 
+                className="w-full border border-gray-300 p-2 rounded-lg bg-gray-50 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
+              {fileName && (
+                <p className="text-xs text-gray-500 mt-1">
+                  📎 {fileName}
+                </p>
+              )}
+            </div>
           </div>
           <button 
             type="submit" 
-            disabled={loading}
+            disabled={loading || !fileDicom}
             className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 transition-colors text-white font-bold py-2.5 px-8 rounded-lg w-full md:w-auto"
           >
-            {loading ? 'Menganalisis...' : 'Analisis AI'}
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                Menganalisis...
+              </span>
+            ) : 'Analisis AI'}
           </button>
         </form>
+        <p className="text-xs text-gray-400 mt-2">* Mendukung format DICOM (.dcm) dan gambar (.jpg, .jpeg, .png)</p>
       </div>
 
       {/* Table Section */}

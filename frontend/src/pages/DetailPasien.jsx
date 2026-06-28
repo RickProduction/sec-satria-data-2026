@@ -2,121 +2,304 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-function DetailPasien() {
+function Detail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [pasien, setPasien] = useState(null);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [shapcamLoading, setShapcamLoading] = useState(false);
+  const [shapcamData, setShapcamData] = useState(null);
+  const [shapcamError, setShapcamError] = useState(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const fetchDetail = async () => {
-      try {
-        const response = await axios.get(`http://localhost:5000/api/pasien/${id}`);
-        if (response.data.status === 'success') {
-          setPasien(response.data.data);
-        }
-      } catch (err) {
-        console.error('Gagal memuat detail pasien:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchDetail();
   }, [id]);
 
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-xl font-bold text-gray-600 animate-pulse">Memuat Hasil Analisis Organ...</div>
-      </div>
-    );
-  }
-
-  if (!pasien) {
-    return (
-      <div className="max-w-6xl mx-auto p-8 text-center">
-        <p className="text-red-500 font-bold">Data pasien tidak ditemukan.</p>
-        <button onClick={() => navigate('/')} className="mt-4 bg-blue-600 text-white p-2 rounded">Kembali</button>
-      </div>
-    );
-  }
-
-  // Komponen Kartu Organ Internal (Reusable Component)
-  const OrganCard = ({ namaOrgan, status, conf }) => {
-    const isCedera = status === 'Cedera';
-    return (
-      <div className="p-6 rounded-xl shadow-sm bg-white border border-gray-200 relative overflow-hidden">
-        <div className={`absolute top-0 left-0 w-full h-1 ${isCedera ? 'bg-red-500' : 'bg-green-500'}`}></div>
-        <h3 className="text-xl font-extrabold text-gray-800 mb-4">{namaOrgan}</h3>
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-gray-500">Prediksi Sistem:</span>
-          <span className={`font-black px-2 py-1 rounded text-sm ${isCedera ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-            {status}
-          </span>
-        </div>
-        <div className="mt-4">
-          <div className="flex justify-between text-xs mb-1">
-            <span className="text-gray-500">Tingkat Kerusakan</span>
-            <span className="font-mono font-bold text-gray-700">{conf}%</span>
-          </div>
-          <div className="w-full bg-gray-100 rounded-full h-2.5 shadow-inner">
-            <div 
-              className={`h-2.5 rounded-full transition-all duration-1000 ${isCedera ? 'bg-red-500' : 'bg-green-500'}`} 
-              style={{ width: `${conf}%` }}
-            ></div>
-          </div>
-        </div>
-      </div>
-    );
+  const fetchDetail = async () => {
+    try {
+      const response = await axios.get(`http://localhost:5000/api/pasien/${id}`);
+      if (response.data.status === 'success') {
+        setData(response.data.data);
+        fetchShapcam();
+      } else {
+        setError('Data tidak ditemukan');
+      }
+    } catch (err) {
+      setError('Gagal mengambil data detail');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return (
-    <div className="max-w-6xl mx-auto p-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-3xl font-extrabold text-gray-800">Laporan Klinis Medis</h1>
-          <p className="text-gray-500 mt-1">
-            Pasien: <span className="font-bold text-gray-800">{pasien.nama_pasien}</span> | Sumber File: <span className="font-mono text-xs">{pasien.file_dicom}</span>
-          </p>
+  const fetchShapcam = async () => {
+    setShapcamLoading(true);
+    setShapcamError(null);
+    try {
+      const response = await axios.get(`http://localhost:5000/api/shapcam/pasien/${id}`, {
+        timeout: 120000
+      });
+      console.log('SHAP-CAM Response:', response.data);
+      
+      if (response.data.status === 'success') {
+        setShapcamData(response.data.data);
+      } else {
+        setShapcamError(response.data.message || 'Gagal memuat SHAP-CAM');
+      }
+    } catch (err) {
+      console.error('SHAP-CAM error:', err);
+      setShapcamError(err.response?.data?.message || err.message || 'Gagal memuat SHAP-CAM');
+    } finally {
+      setShapcamLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="mt-4 text-gray-600">Memuat data pasien...</p>
         </div>
-        <button 
-          onClick={() => navigate('/')} 
-          className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold py-2 px-5 rounded-lg shadow-sm transition-colors"
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="max-w-4xl mx-auto p-8">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+          {error || 'Data tidak ditemukan'}
+        </div>
+        <button
+          onClick={() => navigate('/')}
+          className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg"
         >
-          &larr; Kembali ke Antrean
+          Kembali ke Dashboard
+        </button>
+      </div>
+    );
+  }
+
+  const { nama_pasien, file_dicom, status_kritis, probabilitas_max, organ } = data;
+  
+  const organList = [
+    { key: 'hati', label: 'Hati (Liver)' },
+    { key: 'ginjal', label: 'Ginjal (Kidney)' },
+    { key: 'limpa', label: 'Limpa (Spleen)' },
+    { key: 'usus', label: 'Usus (Bowel)' }
+  ];
+
+  const hasCedera = organList.some(o => organ[o.key]?.status === 'Cedera');
+
+  return (
+    <div className="max-w-5xl mx-auto p-6">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-extrabold text-blue-900">📋 Laporan Klinis Medis</h1>
+        <button
+          onClick={() => navigate('/')}
+          className="text-blue-600 hover:text-blue-800 font-semibold"
+        >
+          ← Kembali ke Dashboard
         </button>
       </div>
 
-      {/* Banner Triase */}
-      {pasien.status_kritis === 1 ? (
-        <div className="bg-linear-to-r from-red-600 to-red-500 text-white p-5 rounded-xl mb-8 shadow-lg flex items-center gap-4">
-          <div className="text-4xl">⚠️</div>
-          <div>
-            <h2 class="font-bold text-xl">PERHATIAN MEDIS DIPERLUKAN (KRITIS)</h2>
-            <p className="text-red-50 text-sm mt-0.5">Sistem mendeteksi probabilitas tinggi adanya trauma internal parah pada organ. Prioritaskan tindakan kedaruratan.</p>
-          </div>
+      {/* Info Pasien */}
+      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
+        <p className="text-gray-700">
+          <span className="font-bold">Pasien:</span> {nama_pasien} 
+          <span className="ml-4 font-bold">Sumber File:</span> {file_dicom}
+        </p>
+      </div>
+
+      {/* Status Kritis */}
+      {status_kritis === 1 ? (
+        <div className="bg-red-50 border-l-4 border-red-600 p-4 rounded-lg mb-6">
+          <h2 className="text-red-800 font-bold text-lg">🚨 PERHATIAN MEDIS DIPERLUKAN (KRITIS)</h2>
+          <p className="text-red-700 mt-1">
+            Sistem mendeteksi probabilitas tinggi adanya trauma internal parah pada organ. 
+            Prioritaskan tindakan keseluruhan.
+          </p>
         </div>
       ) : (
-        <div className="bg-green-600 text-white p-5 rounded-xl mb-8 shadow-md flex items-center gap-4">
-          <div className="text-4xl">✅</div>
-          <div>
-            <h2 className="font-bold text-xl">STATUS AMAN (NORMAL)</h2>
-            <p className="text-green-50 text-sm mt-0.5 font-medium">Berdasarkan ekstraksi fitur statistik citra, organ dalam kondisi batas normal.</p>
-          </div>
+        <div className="bg-green-50 border-l-4 border-green-600 p-4 rounded-lg mb-6">
+          <h2 className="text-green-800 font-bold text-lg">✅ STATUS STABIL</h2>
+          <p className="text-green-700 mt-1">
+            Sistem tidak mendeteksi indikasi trauma internal yang signifikan.
+          </p>
         </div>
       )}
 
-      {/* Grid Status Organ */}
-      <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Status Segmentasi Organ</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <OrganCard namaOrgan="Hati (Liver)" status={pasien.organ.hati.status} conf={pasien.organ.hati.conf} />
-        <OrganCard namaOrgan="Ginjal (Kidney)" status={pasien.organ.ginjal.status} conf={pasien.organ.ginjal.conf} />
-        <OrganCard namaOrgan="Limpa (Spleen)" status={pasien.organ.limpa.status} conf={pasien.organ.limpa.conf} />
-        <OrganCard namaOrgan="Usus (Bowel)" status={pasien.organ.usus.status} conf={pasien.organ.usus.conf} />
+      {/* Status Organ */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+          <h2 className="font-bold text-lg">📊 Status Segmentasi Organ</h2>
+        </div>
+        <div className="divide-y divide-gray-200">
+          {organList.map(({ key, label }) => {
+            const org = organ[key];
+            if (!org) return null;
+            const isCedera = org.status === 'Cedera';
+            const conf = org.conf || 0;
+            
+            return (
+              <div key={key} className="px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold text-gray-700 min-w-30">{label}</span>
+                  <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                    isCedera 
+                      ? 'bg-red-100 text-red-800 border border-red-200' 
+                      : 'bg-green-100 text-green-800 border border-green-200'
+                  }`}>
+                    {org.status}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 mt-2 md:mt-0">
+                  <span className="text-sm text-gray-500">Tingkat Kerusakan:</span>
+                  <div className="w-32 bg-gray-200 rounded-full h-2.5">
+                    <div 
+                      className={`h-2.5 rounded-full transition-all duration-500 ${
+                        isCedera ? 'bg-red-600' : 'bg-green-600'
+                      }`}
+                      style={{ width: `${Math.min(conf, 100)}%` }}
+                    ></div>
+                  </div>
+                  <span className={`text-sm font-bold ${isCedera ? 'text-red-600' : 'text-green-600'}`}>
+                    {isCedera ? conf : '0'}%
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ===== SHAP-CAM SECTION - 2 GAMBAR ===== */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+          <h2 className="font-bold text-lg">🧠 Visualisasi SHAP-CAM</h2>
+        </div>
+        
+        <div className="p-6">
+          {/* Loading */}
+          {shapcamLoading && (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+              <p className="mt-4 text-gray-600">Generating SHAP-CAM visualization...</p>
+              <p className="text-sm text-gray-400 mt-1">Proses ini membutuhkan waktu 10-30 detik</p>
+            </div>
+          )}
+
+          {/* Error */}
+          {shapcamError && !shapcamLoading && (
+            <div className="bg-yellow-50 border border-yellow-400 text-yellow-800 px-4 py-3 rounded-lg">
+              <p className="font-semibold">⚠️ SHAP-CAM tidak tersedia</p>
+              <p className="text-sm">{shapcamError}</p>
+              <button
+                onClick={fetchShapcam}
+                className="mt-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-1 px-4 rounded-lg text-sm transition-colors"
+              >
+                Coba Lagi
+              </button>
+            </div>
+          )}
+
+          {/* SHAP-CAM Data - 2 GAMBAR: Original + Heatmap */}
+          {shapcamData && !shapcamLoading && (
+            <div>
+              {/* Info Prediksi */}
+              <div className="mb-4 flex flex-wrap gap-4 bg-purple-50 p-4 rounded-lg">
+                <div>
+                  <span className="text-sm text-gray-500">Prediksi:</span>
+                  <span className={`ml-2 font-bold ${shapcamData.is_cedera === 1 ? 'text-red-600' : 'text-green-600'}`}>
+                    {shapcamData.is_cedera === 1 ? 'Cedera' : 'Sehat'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-sm text-gray-500">Organ Tertinggi:</span>
+                  <span className="ml-2 font-bold text-purple-600">
+                    {shapcamData.max_organ?.toUpperCase()} ({shapcamData.max_prob}%)
+                  </span>
+                </div>
+                <div>
+                  <span className="text-sm text-gray-500">Detail Organ:</span>
+                  <span className="ml-2 text-sm">
+                    {shapcamData.predictions && Object.entries(shapcamData.predictions).map(([org, prob], idx) => (
+                      <span key={org} className="ml-1">
+                        {org.toUpperCase()}: {typeof prob === 'number' ? prob.toFixed(1) : prob}%
+                        {idx < Object.entries(shapcamData.predictions).length - 1 ? ' | ' : ''}
+                      </span>
+                    ))}
+                  </span>
+                </div>
+              </div>
+
+              {/* 2 Gambar: Original + SHAP-CAM Heatmap (tanpa overlay) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Original */}
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="bg-gray-50 px-3 py-2 text-center border-b border-gray-200">
+                    <span className="font-semibold text-sm">Original CT-Scan</span>
+                  </div>
+                  {shapcamData.original ? (
+                    <img 
+                      src={`data:image/png;base64,${shapcamData.original}`}
+                      alt="Original CT-Scan"
+                      className="w-full h-64 object-contain bg-gray-900"
+                      onError={(e) => {
+                        e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23333"/%3E%3Ctext x="50" y="100" fill="%23fff" font-size="16"%3ENo Image%3C/text%3E%3C/svg%3E';
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-64 flex items-center justify-center bg-gray-900 text-white">
+                      No Image
+                    </div>
+                  )}
+                </div>
+
+                {/* SHAP-CAM Heatmap - dengan kontras lebih tinggi */}
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="bg-gray-50 px-3 py-2 text-center border-b border-gray-200">
+                    <span className="font-semibold text-sm">SHAP-CAM Heatmap</span>
+                  </div>
+                  {shapcamData.heatmap ? (
+                    <img 
+                      src={`data:image/png;base64,${shapcamData.heatmap}`}
+                      alt="SHAP-CAM Heatmap"
+                      className="w-full h-64 object-contain bg-gray-900"
+                      style={{ filter: 'contrast(1.5) brightness(1.2)' }}
+                      onError={(e) => {
+                        e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect width="200" height="200" fill="%23333"/%3E%3Ctext x="50" y="100" fill="%23fff" font-size="16"%3ENo Image%3C/text%3E%3C/svg%3E';
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-64 flex items-center justify-center bg-gray-900 text-white">
+                      No Image
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Keterangan Area Fokus */}
+              <div className="mt-4 text-center text-sm text-gray-500">
+                <p>🔴 <span className="font-semibold">Area merah</span> menunjukkan region yang paling berpengaruh dalam keputusan model</p>
+              </div>
+            </div>
+          )}
+
+          {/* Initial State */}
+          {!shapcamLoading && !shapcamData && !shapcamError && (
+            <div className="text-center py-8 text-gray-500">
+              <p className="text-4xl mb-4">🔄</p>
+              <p>Memuat SHAP-CAM...</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-export default DetailPasien;
+export default Detail;
