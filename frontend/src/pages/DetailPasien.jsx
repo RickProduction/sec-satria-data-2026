@@ -167,7 +167,7 @@ function Detail() {
                     ></div>
                   </div>
                   <span className={`text-sm font-bold ${isCedera ? 'text-red-600' : 'text-green-600'}`}>
-                    {isCedera ? conf : '0'}%
+                    {typeof conf === 'number' ? conf.toFixed(2) : conf}%
                   </span>
                 </div>
               </div>
@@ -209,33 +209,6 @@ function Detail() {
           {/* SHAP-CAM Data - 2 GAMBAR: Original + Heatmap */}
           {shapcamData && !shapcamLoading && (
             <div>
-              {/* Info Prediksi */}
-              <div className="mb-4 flex flex-wrap gap-4 bg-purple-50 p-4 rounded-lg">
-                <div>
-                  <span className="text-sm text-gray-500">Prediksi:</span>
-                  <span className={`ml-2 font-bold ${shapcamData.is_cedera === 1 ? 'text-red-600' : 'text-green-600'}`}>
-                    {shapcamData.is_cedera === 1 ? 'Cedera' : 'Sehat'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-500">Organ Tertinggi:</span>
-                  <span className="ml-2 font-bold text-purple-600">
-                    {shapcamData.max_organ?.toUpperCase()} ({shapcamData.max_prob}%)
-                  </span>
-                </div>
-                <div>
-                  <span className="text-sm text-gray-500">Detail Organ:</span>
-                  <span className="ml-2 text-sm">
-                    {shapcamData.predictions && Object.entries(shapcamData.predictions).map(([org, prob], idx) => (
-                      <span key={org} className="ml-1">
-                        {org.toUpperCase()}: {typeof prob === 'number' ? prob.toFixed(1) : prob}%
-                        {idx < Object.entries(shapcamData.predictions).length - 1 ? ' | ' : ''}
-                      </span>
-                    ))}
-                  </span>
-                </div>
-              </div>
-
               {/* 2 Gambar: Original + SHAP-CAM Heatmap (tanpa overlay) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Original */}

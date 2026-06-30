@@ -1,93 +1,113 @@
 import os
-import joblib
+import numpy as np
+import pydicom
+import zipfile
+import cv2
+from PIL import Image
+import tensorflow as tf
+# Ganti dengan ini:
+from keras.applications.mobilenet_v2 import preprocess_input
+
+# ==========================================================
+# MANTRA SAKTI: Paksa pakai Keras 2 agar format .h5 terbaca
+# ==========================================================
+os.environ['TF_USE_LEGACY_KERAS'] = '1'
+
 import numpy as np
 import pydicom
 import cv2
-from scipy.stats import skew, kurtosis
 from PIL import Image
+import tensorflow as tf
+# (dan import-import lainnya)
 
-# Load Model saat aplikasi dijalankan
-MODEL_PATH = os.path.join(os.path.dirname(__file__), 'models', 'rf_multiorgan_trauma.pkl')
+# ==========================================
+# 1. LOAD MODEL KERAS (VERSI .h5)
+# ==========================================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Arahkan kembali ke .h5
+MODEL_PATH = os.path.join(BASE_DIR, 'models', 'best_mobilenetv2_model.h5')
+
+# Trik Windows
+MODEL_PATH = MODEL_PATH.replace('\\', '/')
+
 try:
-    model = joblib.load(MODEL_PATH)
+    print(f"Mencoba memuat model dari: {MODEL_PATH}")
+    # Load model tanpa compile
+    model = tf.keras.models.load_model(MODEL_PATH, compile=False)
+    print("✅ MANTAP! Model MobileNetV2 format .h5 berhasil diload!")
 except Exception as e:
     model = None
-    print(f"WARNING: Model gagal diload! Error: {e}")
+    print(f"❌ WARNING: Model gagal diload! Error: {e}")
 
-def proses_dicom_ke_hu(file_path):
-    """Proses file DICOM ke HU (Hounsfield Unit)"""
-    dicom = pydicom.dcmread(file_path)
-    image = dicom.pixel_array.astype(np.float64)
-
-    intercept = dicom.RescaleIntercept if 'RescaleIntercept' in dicom else 0.0
-    slope = dicom.RescaleSlope if 'RescaleSlope' in dicom else 1.0
-    hu_image = image * slope + intercept
-
-    hu_image = np.clip(hu_image, -50, 150)
-    hu_image = ((hu_image - (-50)) / 200 * 255).astype(np.uint8)
-    hu_image = cv2.resize(hu_image, (128, 128))
-    return hu_image
-
-def proses_jpg_ke_hu(file_path):
-    """Proses file JPG/PNG ke format yang sama dengan DICOM"""
-    # Baca gambar
-    img = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
-    if img is None:
-        # Coba dengan PIL
-        img = Image.open(file_path).convert('L')
-        img = np.array(img)
+# ==========================================
+# 2. PREPROCESSING CITRA UNTUK MOBILENETV2
+# ==========================================
+def proses_citra_ke_mobilenet(file_path):
+    """
+    Proses file DICOM/JPG/PNG ke format (224, 224, 3) 
+    sesuai syarat input MobileNetV2
+    """
+    file_ext = os.path.splitext(file_path)[1].lower()
     
-    # Resize ke 128x128
-    img = cv2.resize(img, (128, 128))
-    
-    # Normalisasi ke 0-255
-    img = ((img - np.min(img)) / (np.max(img) - np.min(img) + 1e-8) * 255).astype(np.uint8)
-    
-    return img
-
-def ekstraksi_fitur_statistik(image):
-    return [
-        np.mean(image),          
-        np.std(image),           
-        np.var(image),           
-        skew(image.flatten()),   
-        kurtosis(image.flatten())
-    ]
-
-def predict_trauma(image_path):
-    """Prediksi trauma dari file (support .dcm, .jpg, .jpeg, .png)"""
-    file_ext = os.path.splitext(image_path)[1].lower()
-    
-    # Pilih proses berdasarkan ekstensi file
     if file_ext == '.dcm':
         try:
-            gambar_hu = proses_dicom_ke_hu(image_path)
+            dicom = pydicom.dcmread(file_path)
+            img = dicom.pixel_array.astype(np.float64)
+            # Normalisasi 0-255
+            img = ((img - np.min(img)) / (np.max(img) - np.min(img) + 1e-8) * 255).astype(np.uint8)
+            # MobileNet butuh 3 channel (RGB), jadi kita duplikasi channel grayscale-nya
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
         except Exception as e:
-            print(f"Error reading DICOM: {e}")
-            # Jika gagal, coba baca sebagai gambar biasa
-            gambar_hu = proses_jpg_ke_hu(image_path)
+            print(f"Error reading DICOM: {e}, fallback ke PIL/CV2")
+            img = cv2.imread(file_path)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     else:
-        gambar_hu = proses_jpg_ke_hu(image_path)
+        img = cv2.imread(file_path)
+        if img is None:
+            # Fallback pakai PIL jika CV2 gagal
+            img = Image.open(file_path).convert('RGB')
+            img = np.array(img)
+        else:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     
-    features = np.array([ekstraksi_fitur_statistik(gambar_hu)])
+    # 1. Resize ke 224x224
+    img = cv2.resize(img, (224, 224))
+    # 2. Expand dimensi menjadi (1, 224, 224, 3) untuk batch
+    img_array = np.expand_dims(img, axis=0)
+    # 3. Preprocessing bawaan MobileNetV2 (skala piksel -1 hingga 1)
+    img_array = preprocess_input(img_array.astype(np.float32))
+    
+    return img_array
+
+# ==========================================
+# 3. FUNGSI PREDIKSI UTAMA
+# ==========================================
+def predict_trauma(image_path):
+    """Prediksi trauma menggunakan MobileNetV2"""
+    img_array = proses_citra_ke_mobilenet(image_path)
     
     if model:
-        probs = model.predict_proba(features)
+        # Lakukan inferensi
+        preds = model.predict(img_array)
         
-        def aman_ambil_prob_cedera(prob_array):
-            if len(prob_array[0]) > 1:
-                return prob_array[0][1] * 100
-            else:
-                return 0.0
-
-        prob_hati = aman_ambil_prob_cedera(probs[0])
-        prob_ginjal = aman_ambil_prob_cedera(probs[1])
-        prob_limpa = aman_ambil_prob_cedera(probs[2])
-        prob_usus = aman_ambil_prob_cedera(probs[3])
+        # Karena modelmu menggunakan multi-output (4 organ),
+        # urutannya sesuai saat training: ['Ginjal', 'Hati', 'Limpa', 'Usus']
+        if isinstance(preds, list):
+            prob_ginjal = float(preds[0][0][0]) * 100
+            prob_hati = float(preds[1][0][0]) * 100
+            prob_limpa = float(preds[2][0][0]) * 100
+            prob_usus = float(preds[3][0][0]) * 100
+        else:
+            # Jika ter-compile sebagai 1 array matriks
+            prob_ginjal = float(preds[0][0]) * 100
+            prob_hati = float(preds[0][1]) * 100
+            prob_limpa = float(preds[0][2]) * 100
+            prob_usus = float(preds[0][3]) * 100
     else:
-        prob_hati, prob_ginjal, prob_limpa, prob_usus = 0.0, 0.0, 0.0, 0.0
+        prob_ginjal, prob_hati, prob_limpa, prob_usus = 0.0, 0.0, 0.0, 0.0
 
-    threshold = 40.0
+    # Gunakan threshold 50.0% karena aktivasi terakhirmu adalah sigmoid (0.5)
+    threshold = 50.0 
     
     status_hati = "Cedera" if prob_hati > threshold else "Sehat"
     status_ginjal = "Cedera" if prob_ginjal > threshold else "Sehat"
@@ -97,6 +117,7 @@ def predict_trauma(image_path):
     is_kritis = 1 if any(p > threshold for p in [prob_hati, prob_ginjal, prob_limpa, prob_usus]) else 0
     max_prob = max([prob_hati, prob_ginjal, prob_limpa, prob_usus])
 
+    # Format return disamakan persis agar app.py tidak error
     return {
         "status_kritis": is_kritis,
         "probabilitas_max": round(max_prob, 2),
